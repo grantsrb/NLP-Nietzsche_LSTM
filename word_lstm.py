@@ -9,7 +9,7 @@ path = get_file('nietzsche.txt',
 text = nltk.tokenize.word_tokenize(open(path).read())
 words = set(text)
 print('Text length:', len(text))
-print("Num wods:", len(words))
+print("Num words:", len(words))
 
 word_idx = {a:i for i,a in enumerate(words)}
 idx_word = {i:a for i,a in enumerate(words)}
@@ -43,7 +43,7 @@ goals = tf.placeholder(tf.int32, [b_size, seq_len], name='goals')
 emb_mtx = tf.Variable(tf.random_normal((len(words), emb_size), 0, 0.01), name='emb_mtx')
 emb_words = tf.nn.embedding_lookup(emb_mtx, idxs, name='emb_lookup')
 
-words = tf.layers.batch_normalization(emb_words)
+bn_emb_words = tf.layers.batch_normalization(emb_words)
 
 E = tf.Variable(tf.random_normal((emb_size,state_size), 0, 1./np.sqrt(emb_size)),
                                                                             name='E')
@@ -113,7 +113,7 @@ def fwd_prop(prevs, word):
 
     return [h_t2, c_t2]
 
-transposed_words = tf.transpose(words, [1,0,2], name='transpose1')
+transposed_words = tf.transpose(bn_emb_words, [1,0,2], name='transpose1')
 transposed_states = tf.scan(
     fwd_prop,
     transposed_words,
@@ -144,7 +144,7 @@ zero_c = c_t.assign(tf.zeros([b_size, state_size],dtype=tf.float32))
 saver = tf.train.Saver()
 
 zs = np.zeros((b_size-1, seq_len))
-def next_char(sequence, sess):
+def next_word(sequence, sess):
     seq = np.asarray([sequence[-seq_len:]])
     seq = np.concatenate([seq,zs])
     preds, ah, ac = sess.run([outputs, assign_h, assign_c], feed_dict={idxs:seq, z1_do:1.0, c1_do:1.0, h1_do:1.0})
@@ -178,20 +178,20 @@ with tf.Session() as sess:
                                                  z1_do:1., c1_do:.8, h1_do:1.})
             running_avg += cost
         print("Avg Cost:", running_avg/(len(X)//b_size), " "*20)
-        if epoch % 70 == 0:
+        if epoch % 100 == 0:
             zero_out(sess)
             basetime = time.time()
             print("Begin Sample:")
-            seed = "He who fights with monsters might take care lest he thereby become a monster. And if you gaze for long into an abyss "
-            sample = [word_idx[x] for x in list(seed)]
+            seed = text[98:167]
+            sample = [word_idx[x] for x in seed]
             for i in range(len(sample)-seq_len):
-                next_char(sample[i:i+seq_len], sess)
+                next_word(sample[i:i+seq_len], sess)
             sample_len = 300
             for i in range(sample_len):
-                sample.append(next_char(sample, sess))
+                sample.append(next_word(sample, sess))
             print(np.asarray(sample).shape)
             verbalization = [idx_word[i] for i in sample]
-            print("Sample:\n",''.join(verbalization)) 
+            print("Sample:\n",' '.join(verbalization)) 
             print("Execution time:", time.time()-basetime)
 
         zero_out(sess)
